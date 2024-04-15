@@ -1,13 +1,15 @@
-// ignore_for_file: camel_case_types
-
-//import 'dart:html';
-
 import 'package:english_words/english_words.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+
+import 'package:english_words/english_words.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:location/location.dart';
+
+import 'API.dart';
+import 'dart:convert';
 
 void main() {
   runApp(const scav_quest_ui());
@@ -22,6 +24,7 @@ class scav_quest_ui extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    
     return ChangeNotifierProvider(create: (context) => MyAppState(),
     child:MaterialApp(
         title: 'namer app',
@@ -36,18 +39,23 @@ class scav_quest_ui extends StatelessWidget {
 }
 
 class mystoryObj  {
-  
-  
-
-  
   String name = WordPair.random().first;
-  String discription =  "testdes\ndwadwadwadwadawdwadwadwadwa\ndwadwadwadwa";
+  String discription =  "${WordPair.random().first} ${WordPair.random().first} ${WordPair.random().first} ${WordPair.random().first} ${WordPair.random().first}";
   bool status = false;
-
   String workout = "some Workout";
   String possibleLocation = "some Location";
   String itemOfInterest = "some item";
 
+  mystoryObj();
+
+  mystoryObj.setStory(this.name, this.discription, this.status, this.workout, this.possibleLocation, this.itemOfInterest);
+  Icon getStatusIcon()
+  {
+    if(status)
+    return Icon(Icons.check);
+
+    return Icon(Icons.close);
+  }
   Widget get_clues()
   {
     return ListView(
@@ -59,7 +67,10 @@ class mystoryObj  {
 
     );
   }
-
+  void setName(String Name)
+  {
+    name = Name;
+  }
   String getName()
   {
     return name;
@@ -91,21 +102,35 @@ class mystoryObj  {
 }
 
 class MyAppState extends ChangeNotifier {
-  var current = WordPair.random();
+  var current = WordPair.random(); // add database call here
+  var quests = <mystoryObj>[];
+
+  MyAppState() {
+     mystoryObj nobj = mystoryObj.setStory("new story","you begin your amazing fitness journy.\npress next to go start your first chapter",true,"walking","test","the playground");
+    
+    //mystoryObj.setStory(this.name, this.discription, this.status, this.workout, this.possibleLocation, this.itemOfInterest);
+    quests.add(nobj);
+  }
   
   void getNext(){
     current = WordPair.random();
     notifyListeners();
   }
-  var quests = <mystoryObj>[];
+  
   void addQuests() {
     quests.add(mystoryObj());
     notifyListeners();
   }
   void clearQuest(){
     quests.clear();
+    mystoryObj nobj = mystoryObj.setStory("new story","you begin your amazing fitness journy.\npress next to go start your first chapter",true,"walking","test","the playground");
+    
+    //mystoryObj.setStory(this.name, this.discription, this.status, this.workout, this.possibleLocation, this.itemOfInterest);
+    quests.add(nobj);
+
     notifyListeners();
   }
+  
 }
 // Active state 
 
@@ -131,7 +156,7 @@ NavigationDestinationLabelBehavior labelBehavior =
       page = const MapPage();
       break;
       case 2:
-      page = const MystoryDetails();
+      page = MystoryDetails();
       break;
       default:
       throw UnimplementedError("no widget for $selectedIndex");
@@ -163,7 +188,7 @@ NavigationDestinationLabelBehavior labelBehavior =
               NavigationDestination(
                 selectedIcon: Icon(Icons.bookmark),
                 icon: Icon(Icons.bookmark_border),
-                label: 'DETAIS',
+                label: 'DETAILS',
               ),
             ],
           ),
@@ -178,9 +203,19 @@ NavigationDestinationLabelBehavior labelBehavior =
 }
 
 
-class MystoryDetails extends StatelessWidget {
+class MystoryDetails extends StatefulWidget {
   const MystoryDetails({super.key});
 
+  @override
+  _MystoryDetails createState() => _MystoryDetails();
+}
+
+class _MystoryDetails extends State<MystoryDetails> {
+  String url = '';
+
+  var Data;
+  String QueryText = 'Query';
+  
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
@@ -190,6 +225,32 @@ class MystoryDetails extends StatelessWidget {
         
         
         children: [
+             
+          //communicates with python code
+          TextField(
+            onChanged: (value) {
+                  url = 'http://127.0.0.1:5000/api?Query=' + value.toString();
+                  print('button pressed! url is $url');
+                },
+                decoration: InputDecoration(
+                    hintText: 'Search Anything Here',
+                    suffixIcon: GestureDetector(
+                        onTap: () async {
+                          print('we tapped!');
+                          Data = await Getdata(url);
+                          var DecodedData = jsonDecode(Data);
+                          print('onTap called! data is $Data');
+                          setState(() {
+                            QueryText = DecodedData['Query'];
+                          });
+                          mystoryObj nobj = mystoryObj.setStory(QueryText,"${WordPair.random().first} ${WordPair.random().first} ${WordPair.random().first} ${WordPair.random().first} ${WordPair.random().first}",true, "${WordPair.random().first}" ,"${WordPair.random().first}", "${WordPair.random().first}");
+                          appState.quests.add(nobj);
+                          appState.notifyListeners();
+                        },
+                        child: Icon(Icons.search))),
+            ),
+            //
+          
           ElevatedButton(onPressed: () {
             
             appState.addQuests();
@@ -200,10 +261,14 @@ class MystoryDetails extends StatelessWidget {
             
            
           } ,child: Text("clear obj")),
-          Padding(padding: EdgeInsets.all(20),child: Text('you have ${appState.quests.length} quests'),),
-          for(mystoryObj quest in appState.quests) 
+          Padding(
+            padding: EdgeInsets.all(20),
+            child: Text(
+              "",
+               style: TextStyle(fontSize: 30.0, fontWeight: FontWeight.bold),),)
+         , for(mystoryObj quest in appState.quests) 
           ListTile(
-            leading: Icon(Icons.check),
+            leading: quest.getStatusIcon(),
             title: Text(quest.getName()),
             subtitle: Text(quest.getDiscr()),
           ),
@@ -212,8 +277,50 @@ class MystoryDetails extends StatelessWidget {
   }
   
 }
-class MapPage extends StatelessWidget {
-  const MapPage({super.key});
+
+class MapPage extends StatefulWidget {
+  const MapPage({Key? key}) : super(key: key);
+
+  @override
+  State<MapPage> createState() => _MapPageState();
+}
+
+
+class _MapPageState extends State<MapPage> {
+  ///////////////////////
+  late bool _serviceEnabled;
+  late PermissionStatus _permissionGranted;
+
+  LocationData? _userLocation;
+
+  // This function will get user location
+  Future<void> _getUserLocation() async {
+    Location location = Location();
+
+    // Check if location service is enable
+    _serviceEnabled = await location.serviceEnabled();
+    if (!_serviceEnabled) {
+      _serviceEnabled = await location.requestService();
+      if (!_serviceEnabled) {
+        return;
+      }
+    }
+
+    // Check if permission is granted
+    _permissionGranted = await location.hasPermission();
+    if (_permissionGranted == PermissionStatus.denied) {
+      _permissionGranted = await location.requestPermission();
+      if (_permissionGranted != PermissionStatus.granted) {
+        return;
+      }
+    }
+
+    final locationData = await location.getLocation();
+    setState(() {
+      _userLocation = locationData;
+    });
+  }
+  ///////////////////////
 
   @override
   Widget build(BuildContext context) {
@@ -222,7 +329,36 @@ class MapPage extends StatelessWidget {
     IconData icon;
  
     
-return Scaffold(body: Text("map page"),);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Check Location'),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton(
+                  onPressed: _getUserLocation,
+                  child: const Text('Check Location')),
+              const SizedBox(height: 25),
+              // Display latitude & longtitude
+              _userLocation != null
+                  ? Wrap(
+                      children: [
+                        Text('Your latitude: ${_userLocation?.latitude}'),
+                        const SizedBox(width: 10),
+                        Text('Your longtitude: ${_userLocation?.longitude}')
+                      ],
+                    )
+                  : const Text(
+                      'Please enable location service and grant permission')
+            ],
+          ),
+        ),
+      ),
+  );
 
 
 
@@ -237,7 +373,7 @@ class StatsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
     var pair = appState.current;
-
+mystoryObj currentObj = appState.quests.last;
 
  return Scaffold(
     
@@ -245,30 +381,105 @@ class StatsPage extends StatelessWidget {
       
       children: <Widget>[
         
+        ElevatedButton(onPressed: (){
+          appState.quests.last.status = true;
 
+        }, child: Text("complete task")),
         Column(
+          
           children: [
-            SizedBox(height: 2,),
+            const SizedBox(height: 2),
             Container(
               height: 50,
               color: Theme.of(context).colorScheme.primaryContainer,
-              child: Center(child: Text(appState.quests.last.getName()))
+              child: Center(child: Text(currentObj.getName()))
             ),
+             Align(
+              alignment: Alignment.centerLeft,
+               child: Container(
+                height: 2000,
+                color: Theme.of(context).colorScheme.background,
+                 child: Column(
+                  children: <Widget>[
+                 // mainAxisAlignment: MainAxisAlignment.start,
+                  descriptionBox(currentObj: currentObj),
+                  HintWidget(currentObj: currentObj),
+                  actionWidget(currentObj: currentObj),
+                               
+                  ]
+                 
+                           ),
+               ),
+             ),
+
+              ],
+            )
           ],
         ),
 
 
 
 
-      ],
+      
       
 
-    ),);
+    );
 
 
 
   }
   
+}
+
+class actionWidget extends StatelessWidget {
+  const actionWidget({
+    super.key,
+    required this.currentObj,
+  });
+
+  final mystoryObj currentObj;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(22.0),
+      child: Row(children:[Text("ACTION: ${currentObj.getWorkout()}")]),
+    );
+  }
+}
+
+class HintWidget extends StatelessWidget {
+  const HintWidget({
+    super.key,
+    required this.currentObj,
+  });
+
+  final mystoryObj currentObj;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(22.0),
+      child: Row(children:[Text("HINT: ${currentObj.getLocHint()}")]),
+    );
+  }
+}
+
+class descriptionBox extends StatelessWidget {
+  const descriptionBox({
+    super.key,
+    required this.currentObj,
+  });
+
+  final mystoryObj currentObj;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(22.0),
+      child: Row(children:[Text("discription: ${currentObj.getDiscr()}")]),
+    );
+  }
 }
 class styledButton extends StatelessWidget {
   const styledButton({
